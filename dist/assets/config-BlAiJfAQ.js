@@ -1,0 +1,1 @@
+const E="EQCAMHBIH-5MMZvniIWV0l3PUmveWve3hWUffIh7Fw4HLNhP",s=1e3,t="9f2d68b9c97f918c6c3f6143d2036610a2dd335ff323109e8e65e9ba48991bb7",e="https://testnet.toncenter.com/api/v3",N="whsxg";export{N as A,E as C,s as N,e as T,t as a};
