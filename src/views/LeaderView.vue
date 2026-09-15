@@ -59,33 +59,17 @@
 </template>
 
 <script setup>
-import { ref, computed, inject, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import { TonConnectUIContext } from 'ton-ui-vue';
 import { db } from '../firebase';
 import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-
-const tonConnectUI = inject(TonConnectUIContext);
+import { walletAddress } from '../walletStore';
 
 const players = ref([]);
-const me = ref('');
+const me = computed(() => walletAddress.value);
 const empty = computed(() => players.value.length === 0);
 
 let unsub = null;
-let unsubStatus = null;
-
-const tc = () => tonConnectUI?.value;
-
-function setupWallet() {
-    const wc = tc();
-    if (!wc || wc.__hatedogsListening) return;
-    wc.__hatedogsListening = true;
-
-    me.value = wc.wallet?.account?.address || '';
-    unsubStatus = wc.onStatusChange((wallet) => {
-        me.value = wallet?.account?.address || '';
-    });
-}
 
 onMounted(() => {
     const q = query(
@@ -101,14 +85,10 @@ onMounted(() => {
         },
         (err) => console.error(err)
     );
-
-    setupWallet();
-    watch(tonConnectUI, () => setupWallet());
 });
 
 onUnmounted(() => {
     if (unsub) unsub();
-    if (unsubStatus) unsubStatus();
 });
 
 const shortAddress = (address) => {

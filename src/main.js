@@ -3,13 +3,9 @@ import './assets/main.css'
 import { createApp } from 'vue'
 import App from '../components/App.vue'
 import router from './router'
-import { createTonConnectUIProvider, TonConnectUIContext, TonConnectUIOptionsContext } from 'ton-ui-vue';
+import { initTonConnect, TonConnectUIContext, TonConnectUIOptionsContext, tonConnectUI } from './walletStore';
 
-const manifestUrl = `https://raw.githubusercontent.com/MatveyVue/manifest/refs/heads/main/HateDogsManifest.json`;
-
-const { tonConnectUI, setOptions } = createTonConnectUIProvider({
-  manifestUrl
-});
+const { setOptions } = initTonConnect();
 
 const app = createApp(App)
 app.provide(TonConnectUIContext, tonConnectUI);

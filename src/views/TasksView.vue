@@ -29,7 +29,7 @@
             <button class="modal-btn" @click="addTask">Add task</button>
         </div>
 
-        <div class="msg" v-if="msg">{{ msg }}</div>
+        <div class="msg" :class="{ err: msgIsError }" v-if="msg">{{ msg }}</div>
 
         <div class="scroll">
             <div v-if="tasks.length === 0" class="empty">No tasks yet. Add via Admin.</div>
@@ -78,9 +78,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, inject, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import { TonConnectUIContext } from 'ton-ui-vue';
 import { db } from '../firebase';
 import {
     collection,
@@ -90,16 +89,13 @@ import {
     addDoc,
     deleteDoc,
     doc,
-    setDoc,
+    writeBatch,
     serverTimestamp,
     increment
 } from 'firebase/firestore';
 import { verifyTask } from '../services/taskVerify';
 import { ADMIN_USERNAME } from '../config';
-
-const tonConnectUI = inject(TonConnectUIContext);
-
-const tc = () => tonConnectUI?.value;
+import { walletAddress } from '../walletStore';
 
 function telegramUser() {
     try {
@@ -113,8 +109,9 @@ const tasks = ref([]);
 const completed = ref({});
 const claiming = ref('');
 const msg = ref('');
+const msgIsError = ref(false);
 const adminMode = ref(false);
-const meAddress = ref('');
+const meAddress = computed(() => walletAddress.value);
 
 const isAdmin = computed(() => {
     const username = telegramUser()?.username;
@@ -131,25 +128,14 @@ const form = reactive({
 
 let unsubTasks = null;
 let unsubCompleted = null;
-let unsubStatus = null;
 
-function setupWallet() {
-    const wc = tc();
-    if (!wc || wc.__hatedogsListening) return;
-    wc.__hatedogsListening = true;
-
-    meAddress.value = wc.wallet?.account?.address || '';
-    if (meAddress.value) subscribeCompleted(meAddress.value);
-
-    unsubStatus = wc.onStatusChange((wallet) => {
-        meAddress.value = wallet?.account?.address || '';
-        if (unsubCompleted) {
-            unsubCompleted();
-            unsubCompleted = null;
-        }
-        if (meAddress.value) subscribeCompleted(meAddress.value);
-    });
-}
+watch(meAddress, (addr) => {
+    if (unsubCompleted) {
+        unsubCompleted();
+        unsubCompleted = null;
+    }
+    if (addr) subscribeCompleted(addr);
+}, { immediate: true });
 
 function subscribeCompleted(address) {
     unsubCompleted = onSnapshot(
@@ -171,15 +157,11 @@ onMounted(() => {
         },
         (err) => console.error(err)
     );
-
-    setupWallet();
-    watch(tonConnectUI, () => setupWallet());
 });
 
 onUnmounted(() => {
     if (unsubTasks) unsubTasks();
     if (unsubCompleted) unsubCompleted();
-    if (unsubStatus) unsubStatus();
 });
 
 async function addTask() {
@@ -214,36 +196,45 @@ function openLink(link) {
 
 async function claim(task) {
     if (!meAddress.value) {
-        msg.value = 'Connect your wallet first';
+        showMsg('Connect your wallet first', true);
         return;
     }
     if (completed.value[task.id] || claiming.value) return;
 
     claiming.value = task.id;
-    msg.value = '';
     try {
         const result = await verifyTask(task, meAddress.value);
         if (result.success) {
-            await setDoc(doc(db, 'users', meAddress.value, 'completedTasks', task.id), {
+            const batch = writeBatch(db);
+            batch.set(doc(db, 'users', meAddress.value, 'completedTasks', task.id), {
                 taskId: task.id,
                 completedAt: serverTimestamp(),
                 reward: task.reward
             });
-            await setDoc(
+            batch.set(
                 doc(db, 'users', meAddress.value),
                 { tokens: increment(task.reward) },
                 { merge: true }
             );
-            msg.value = `+${task.reward.toLocaleString('en-US')} HDOGS!`;
+            await batch.commit();
+            showMsg(`+${task.reward.toLocaleString('en-US')} HDOGS!`, false);
         } else {
-            msg.value = result.message || 'Not verified. Make sure you completed the task.';
+            showMsg(result.message || 'Not verified. Make sure you completed the task.', true);
         }
     } catch (e) {
         console.error(e);
-        msg.value = 'Error, try again';
+        showMsg('Error: ' + (e?.message || 'try again'), true);
     } finally {
         claiming.value = '';
     }
+}
+
+function showMsg(text, isError = false) {
+    msg.value = text;
+    msgIsError.value = isError;
+    setTimeout(() => {
+        if (msg.value === text) msg.value = '';
+    }, 4000);
 }
 
 const iconFor = (type) =>
@@ -341,6 +332,11 @@ const iconFor = (type) =>
     font-size: 13px;
     margin: 2px 0 8px;
     text-align: center;
+}
+
+.msg.err {
+    color: #ffcc00;
+    font-size: 12px;
 }
 
 .scroll {

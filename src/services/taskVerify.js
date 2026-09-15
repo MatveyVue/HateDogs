@@ -11,6 +11,16 @@ export async function verifyTask(task, walletAddress) {
         return { success: true, message: 'verified' };
     }
 
+    const telegramUserId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null;
+
+    if (!telegramUserId) {
+        return { success: false, message: 'Telegram user not detected — open the app from the bot inside Telegram' };
+    }
+
+    if (!task.chatId) {
+        return { success: false, message: 'Task has no chatId — set it in Admin' };
+    }
+
     try {
         const res = await fetch(botUrl, {
             method: 'POST',
@@ -19,16 +29,19 @@ export async function verifyTask(task, walletAddress) {
                 taskId: task.id,
                 chatId: task.chatId,
                 walletAddress,
-                telegramUserId:
-                    window.Telegram?.WebApp?.initDataUnsafe?.user?.id || null
+                telegramUserId
             })
         });
 
+        let data = null;
+        try {
+            data = await res.json();
+        } catch (e) { /* ignore */ }
+
         if (!res.ok) {
-            return { success: false, message: 'Bot check failed (' + res.status + ')' };
+            return { success: false, message: data?.message || 'Bot check failed (' + res.status + ')' };
         }
 
-        const data = await res.json();
         return typeof data?.success !== 'undefined' ? data : { success: false, message: 'Bad response from bot' };
     } catch (e) {
         return { success: false, message: e.message };
