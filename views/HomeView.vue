@@ -53,7 +53,7 @@
 
     <div class="balance">
         <h1 style="color: white; margin: 15%; font-weight: 800; font-size: 36px;">{{ userTokens.toLocaleString('en-US') }}</h1>
-        <img style="margin-top: -50px;" :src="'/HateDogs.PNG'" width="60%">
+        <img style="margin-top: -50px;" :src="'/HateDogs.PNG'" width="250vw">
     </div>
 
     <button class="claim-btn">Claim</button>
@@ -73,30 +73,26 @@
 </template>
 
 <script setup>
-import { ref, inject, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onUnmounted } from 'vue';
 import { RouterLink } from 'vue-router';
-import { TonConnectUIContext } from 'ton-ui-vue';
 import { db } from '../firebase';
 import { doc, setDoc, getDoc, serverTimestamp, increment, onSnapshot } from 'firebase/firestore';
 import { getOwnedCollectionNfts } from '../services/nft';
 import { NFT_REWARD_PER_ITEM } from '../config';
-
-const tonConnectUI = inject(TonConnectUIContext);
+import { tonConnectUI, walletAddress } from '../walletStore';
 
 const modalState = ref('hidden');
 const tokensAwarded = ref(0);
 const userTokens = ref(0);
 const tgUser = ref(readTgUser());
-const connectedAddress = ref('');
+const connectedAddress = walletAddress;
 const connectingWallet = ref(false);
 
 let unsubUser = null;
-let unsubStatus = null;
 let hideTimer = null;
 let processingAddress = null;
-let setupDone = false;
 
-const tc = () => tonConnectUI?.value;
+const tc = () => tonConnectUI.value;
 
 function readTgUser() {
     try {
@@ -145,52 +141,32 @@ function scheduleHide(ms = 2500) {
     }, ms);
 }
 
-function setupWallet() {
-    const wc = tc();
-    if (!wc || setupDone) return;
-    setupDone = true;
-
-    unsubStatus = wc.onStatusChange(async (wallet) => {
-        if (wallet?.account?.address) {
-            connectedAddress.value = wallet.account.address;
-            modalState.value = 'hidden';
-            await handleConnected(wallet.account.address);
-        } else {
-            connectedAddress.value = '';
-            userTokens.value = 0;
-            modalState.value = 'hidden';
-            if (unsubUser) {
-                unsubUser();
-                unsubUser = null;
-            }
-        }
-    });
-
-    if (wc.wallet?.account?.address) {
-        connectedAddress.value = wc.wallet.account.address;
+watch(walletAddress, async (addr) => {
+    if (addr) {
         modalState.value = 'hidden';
-        handleConnected(wc.wallet.account.address);
-    }
-}
-
-onMounted(() => {
-    setupWallet();
-    watch(tonConnectUI, () => setupWallet());
-
-    watch(tgUser, (tg) => {
-        if (tg && connectedAddress.value) {
-            setDoc(
-                doc(db, 'users', connectedAddress.value),
-                profileFromTg(tg, connectedAddress.value),
-                { merge: true }
-            ).catch((err) => console.error(err));
+        await handleConnected(addr);
+    } else {
+        userTokens.value = 0;
+        modalState.value = 'hidden';
+        if (unsubUser) {
+            unsubUser();
+            unsubUser = null;
         }
-    });
+    }
+}, { immediate: true });
+
+watch(tgUser, (tg) => {
+    if (tg && connectedAddress.value) {
+        setDoc(
+            doc(db, 'users', connectedAddress.value),
+            profileFromTg(tg, connectedAddress.value),
+            { merge: true }
+        ).catch((err) => console.error(err));
+    }
 });
 
 onUnmounted(() => {
     if (hideTimer) clearTimeout(hideTimer);
-    if (unsubStatus) unsubStatus();
     if (unsubUser) unsubUser();
 });
 
