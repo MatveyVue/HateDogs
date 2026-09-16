@@ -53,7 +53,7 @@
 
     <div class="balance">
         <h1 style="color: white; margin: 15%; font-weight: 800; font-size: 36px;">{{ userTokens.toLocaleString('en-US') }}</h1>
-        <img style="margin-top: -50px;" :src="'/HateDogs.PNG'" width="250vw">
+        <img style="margin-top: -50px;" :src="'/HateDogs.PNG'" width="250vw" height="250vw">
     </div>
 
     <div class="bar">
