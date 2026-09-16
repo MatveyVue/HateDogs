@@ -53,10 +53,8 @@
 
     <div class="balance">
         <h1 style="color: white; margin: 15%; font-weight: 800; font-size: 36px;">{{ userTokens.toLocaleString('en-US') }}</h1>
-        <img style="margin-top: -50px;" :src="'/HateDogs.PNG'" width="60%">
+        <img style="margin-top: -50px;" :src="'/HateDogs.PNG'" width="250vw">
     </div>
-
-    <button class="claim-btn">Claim</button>
 
     <div class="bar">
         <RouterLink to="/leaderboard">
